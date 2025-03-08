@@ -2,6 +2,10 @@
 
 A modern take on the classic Breakout game, built with p5.js. Features multiple ball mechanics, different brick types, and dynamic gameplay.
 
+## Play Now!
+
+🎮 [Play the game here](https://prasincs.github.io/orbital-breakout/) 
+
 ## Features
 
 - Multiple ball mechanics with stream balls
@@ -11,7 +15,7 @@ A modern take on the classic Breakout game, built with p5.js. Features multiple 
 - Aim control before launching the ball
 - Progressive difficulty as you clear levels
 
-## Getting Started
+## Local Development
 
 ### Prerequisites
 
@@ -43,13 +47,25 @@ npm start
 
 ## Gameplay
 
-- Use the left and right arrow keys to move the paddle.
-- Use the spacebar to launch the ball.
 
-## Contributing
+The game will be available at `http://localhost:8080`
 
-Contributions are welcome! Please feel free to submit a PR.
+## How to Play
+
+- Use LEFT and RIGHT arrow keys to move the paddle
+- Before launching, use arrow keys to aim the ball
+- Press SPACE to launch the ball
+- Break all bricks to advance to the next level
+- Collect stream balls for multi-ball action
+- Don't let the main ball fall below the paddle!
+
+## Development
+
+This project uses:
+- p5.js for graphics and game logic
+- http-server for local development
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
