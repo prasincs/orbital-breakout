@@ -1,0 +1,20 @@
+Objective:
+Destroy all the bricks on the screen by bouncing balls off your paddle.
+Each level increases in complexity with brick patterns and speed.
+Core Mechanics:
+Paddle Control: Use the left and right arrows (or touchscreen swipe) to move the paddle horizontally at the bottom of the screen.
+Ball Launch: Start with one ball. The initial angle of the ball’s launch can be adjusted by holding a direction (up, up-left, up-right) before releasing. The game provides a subtle angle indicator to help find the "optimal angle" for maximum brick hits.
+Brick Breaking: Each brick has a number (e.g., 36, 34, 72 from your image) indicating its hit points. You must hit it that many times to destroy it. Different colors (green, pink, blue) could indicate varying durability or special effects.
+Twist: Orbiting Balls
+Every 5 turns (successful hits on bricks), you earn an extra ball.
+These extra balls "orbit" around the main ball in a small radius, following its trajectory. You can control their behavior:
+Passive Mode: They bounce independently but stay near the main ball.
+Active Mode: Press a button to "merge" them with the main ball, temporarily increasing its size and damage for a limited time (e.g., 5 seconds).
+The orbiting balls add a layer of strategy, as you must time their use to hit clusters of high-hit-point bricks (like the 72 in your image).
+Scoring and Progression:
+Points are awarded based on the number of hits and the difficulty of bricks destroyed.
+Bonus points for clearing a level with all extra balls intact.
+Levels advance with new brick patterns, and occasional power-ups (e.g., paddle length increase, multi-ball activation) drop from destroyed bricks.
+Interface Inspiration:
+The screen layout from your image (with a large number "36" and a grid of smaller numbers) could represent the current level or a brick’s hit points. The "MENU" button suggests a pause or options screen, which we’ll include.
+A clean, dark background with colorful bricks (green for standard, pink for tougher, blue for special) mirrors the aesthetic.
