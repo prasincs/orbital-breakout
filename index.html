@@ -1,3 +1,4 @@
+
 <!-- index.html -->
 <!DOCTYPE html>
 <html>
@@ -12,17 +13,20 @@
 <body>
   <script>
     let paddle;
-    let ball;
-    let bricks = [];
+    let mainBall;
     let orbitingBalls = [];
     let score = 0;
     let turns = 0;
+    let gameStarted = false;
+    let aimAngle = -Math.PI/4; // Start aiming up-right
     let brickHitPoints = { green: 34, pink: 26, blue: 14 };
-
+    let bricks = [];
+    
     function setup() {
       createCanvas(600, 400);
       paddle = new Paddle();
-      ball = new Ball();
+      mainBall = new Ball();
+      mainBall.isMain = true;
       initializeBricks();
     }
 
@@ -30,42 +34,156 @@
       background(30);
       paddle.show();
       paddle.move();
-      ball.show();
-      ball.move();
-      ball.bounce();
+      
+      // Draw aiming line if game not started
+      if (!gameStarted) {
+        stroke(255);
+        strokeWeight(2);
+        let lineLength = 100;
+        line(mainBall.x, mainBall.y, 
+             mainBall.x + cos(aimAngle) * lineLength, 
+             mainBall.y + sin(aimAngle) * lineLength);
+        strokeWeight(1);
+        noStroke();
+        
+        // Adjust aim angle with arrow keys
+        if (keyIsDown(LEFT_ARROW)) aimAngle -= 0.05;
+        if (keyIsDown(RIGHT_ARROW)) aimAngle += 0.05;
+        // Clamp angle to reasonable range (upward directions)
+        aimAngle = constrain(aimAngle, -PI, 0);
+      }
+      
+      // Handle all balls
+      mainBall.show();
+      if (gameStarted) {
+        mainBall.move();
+        mainBall.bounce();
+      } else {
+        // Position ball on paddle before launch
+        mainBall.x = paddle.x + paddle.w/2;
+        mainBall.y = paddle.y - mainBall.r;
+      }
+      
+      // Handle orbiting balls
       for (let i = orbitingBalls.length - 1; i >= 0; i--) {
         orbitingBalls[i].show();
-        orbitingBalls[i].move();
-        orbitingBalls[i].bounce();
-      }
-      for (let i = bricks.length - 1; i >= 0; i--) {
-        bricks[i].show();
-        if (ball.hits(bricks[i]) || orbitingBalls.some(ob => ob.hits(bricks[i]))) {
-          bricks[i].hit();
-          if (bricks[i].hp <= 0) bricks.splice(i, 1);
-          score += 10;
-          turns++;
-          if (turns % 5 === 0 && turns > 0) addOrbitingBall();
+        if (gameStarted) {
+          orbitingBalls[i].move();
+          orbitingBalls[i].bounce();
+        } else {
+          // When not started, orbiting balls stay with main ball
+          orbitingBalls[i].x = mainBall.x;
+          orbitingBalls[i].y = mainBall.y;
         }
       }
+      
+      // Check ball-brick collisions
+      checkBrickCollisions();
+
+      // Display score and turns
       fill(255);
       textSize(16);
       text(`Score: ${score}`, 10, 20);
       text(`Turns: ${turns}`, 10, 40);
+      
+      // Instructions
+      if (!gameStarted) {
+        textAlign(CENTER);
+        text("Use LEFT/RIGHT arrows to aim, SPACE to launch", width/2, height - 50);
+        textAlign(LEFT);
+      }
+    }
+
+    function keyPressed() {
+      if (keyCode === 32 && !gameStarted) { // Space bar
+        gameStarted = true;
+        mainBall.dx = cos(aimAngle) * 5;
+        mainBall.dy = sin(aimAngle) * 5;
+        
+        // Launch orbiting balls too
+        for (let ball of orbitingBalls) {
+          ball.dx = mainBall.dx + random(-0.5, 0.5);
+          ball.dy = mainBall.dy + random(-0.5, 0.5);
+        }
+      }
     }
 
     function initializeBricks() {
+      bricks = []; // Clear existing bricks
       let types = ['green', 'pink', 'blue'];
+      
       for (let x = 50; x < width - 50; x += 60) {
         for (let y = 50; y < 150; y += 30) {
-          let type = random(types);
-          bricks.push(new Brick(x, y, brickHitPoints[type], type));
+          // Random chance to place a brick (70%)
+          if (random() < 0.7) {
+            let type = random(types);
+            let hp = brickHitPoints[type];
+            // Instead of bricks, create orbiting balls
+            bricks.push(new Ball(x + 25, y + 10, false, hp, type));
+          }
         }
       }
     }
 
     function addOrbitingBall() {
-      orbitingBalls.push(new Ball(ball.x, ball.y, true));
+      let newBall = new Ball(mainBall.x, mainBall.y, true);
+      newBall.isOrbiting = true;
+      newBall.orbitDistance = random(20, 40);
+      newBall.orbitSpeed = random(0.05, 0.1);
+      newBall.orbitOffset = random(TWO_PI);
+      orbitingBalls.push(newBall);
+    }
+    
+    function checkBrickCollisions() {
+      // Check main ball collisions with bricks
+      for (let i = bricks.length - 1; i >= 0; i--) {
+        // Check main ball
+        if (checkBallBrickCollision(mainBall, bricks[i])) {
+          processBrickHit(bricks[i], i);
+        }
+        
+        // Check orbiting balls
+        for (let j = 0; j < orbitingBalls.length; j++) {
+          if (checkBallBrickCollision(orbitingBalls[j], bricks[i])) {
+            processBrickHit(bricks[i], i);
+            break; // Only count one hit per frame
+          }
+        }
+      }
+    }
+    
+    function checkBallBrickCollision(ball, brick) {
+      // Only process collisions for moving balls, not the bricks (which are represented as balls)
+      if (!ball.isBrick && brick.isBrick) {
+        let dx = ball.x - brick.x;
+        let dy = ball.y - brick.y;
+        let distance = sqrt(dx*dx + dy*dy);
+        
+        if (distance < ball.r + brick.r) {
+          // Calculate collision angle for proper physics
+          let angle = atan2(dy, dx);
+          
+          // Update ball velocity
+          let speed = sqrt(ball.dx*ball.dx + ball.dy*ball.dy);
+          ball.dx = cos(angle) * speed;
+          ball.dy = sin(angle) * speed;
+          
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    function processBrickHit(brick, index) {
+      brick.hp--;
+      score += 10;
+      turns++;
+      
+      if (brick.hp <= 0) {
+        // Convert brick to orbiting ball
+        addOrbitingBall();
+        bricks.splice(index, 1);
+      }
     }
 
     class Paddle {
@@ -75,70 +193,113 @@
         this.x = width / 2 - this.w / 2;
         this.y = height - 30;
       }
-      show() { fill(255); rect(this.x, this.y, this.w, this.h); }
+      
+      show() { 
+        fill(255); 
+        rect(this.x, this.y, this.w, this.h); 
+      }
+      
       move() {
-        if (keyIsDown(LEFT_ARROW) && this.x > 0) this.x -= 5;
-        if (keyIsDown(RIGHT_ARROW) && this.x < width - this.w) this.x += 5;
+        if (keyIsDown(LEFT_ARROW) && gameStarted && this.x > 0) this.x -= 5;
+        if (keyIsDown(RIGHT_ARROW) && gameStarted && this.x < width - this.w) this.x += 5;
       }
     }
 
     class Ball {
-      constructor(x = width / 2, y = height / 2, orbiting = false) {
+      constructor(x = width / 2, y = height - 40, isOrbiting = false, hp = 0, type = null) {
         this.x = x;
         this.y = y;
         this.r = 10;
-        this.dx = orbiting ? random(-2, 2) : 4;
-        this.dy = orbiting ? random(-2, 2) : -4;
-        this.orbiting = orbiting;
-      }
-      show() { fill(255, 0, 255); ellipse(this.x, this.y, this.r * 2); }
-      move() {
-        this.x += this.dx;
-        this.y += this.dy;
-        if (this.orbiting) {
-          let angle = atan2(ball.y - this.y, ball.x - this.x);
-          this.x = ball.x + cos(angle) * 30;
-          this.y = ball.y + sin(angle) * 30;
-        }
-      }
-      bounce() {
-        if (this.x <= 0 || this.x >= width) this.dx *= -1;
-        if (this.y <= 0) this.dy *= -1;
-        if (this.y >= height - paddle.h && this.x > paddle.x && this.x < paddle.x + paddle.w) {
-          this.dy *= -1;
-          // Adjust angle based on paddle position
-          let relativeIntersect = (this.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
-          this.dx = 4 * relativeIntersect;
-        }
-        if (this.y > height) {
-          if (!this.orbiting) ball = new Ball();
-          else orbitingBalls = orbitingBalls.filter(b => b !== this);
-        }
-      }
-      hits(brick) {
-        return this.x > brick.x && this.x < brick.x + brick.w && this.y > brick.y && this.y < brick.y + brick.h;
-      }
-    }
-
-    class Brick {
-      constructor(x, y, hp, type) {
-        this.x = x;
-        this.y = y;
-        this.w = 50;
-        this.h = 20;
+        this.dx = 0;
+        this.dy = 0;
+        this.isOrbiting = isOrbiting;
+        this.isMain = false;
+        this.isBrick = hp > 0;
         this.hp = hp;
         this.type = type;
+        
+        // Orbiting properties
+        if (isOrbiting) {
+          this.orbitDistance = 30;
+          this.orbitSpeed = 0.05;
+          this.orbitOffset = 0;
+        }
       }
-      show() {
-        if (this.type === 'green') fill(0, 255, 0);
-        else if (this.type === 'pink') fill(255, 0, 255);
-        else fill(0, 0, 255);
-        rect(this.x, this.y, this.w, this.h);
-        fill(255);
-        textSize(12);
-        text(this.hp, this.x + this.w / 2, this.y + this.h / 2);
+      
+      show() { 
+        if (this.isBrick) {
+          // Render as a brick (colorful ball with a number)
+          if (this.type === 'green') fill(0, 255, 0);
+          else if (this.type === 'pink') fill(255, 0, 255);
+          else fill(0, 0, 255);
+          
+          ellipse(this.x, this.y, this.r * 2);
+          fill(255);
+          textAlign(CENTER, CENTER);
+          textSize(12);
+          text(this.hp, this.x, this.y);
+          textAlign(LEFT);
+        } else {
+          // Render as a white ball
+          fill(255);
+          ellipse(this.x, this.y, this.r * 2);
+        }
       }
-      hit() { this.hp--; }
+      
+      move() {
+        if (this.isBrick) return; // Bricks don't move
+        
+        if (this.isOrbiting && mainBall) {
+          // Orbit around main ball
+          let angle = frameCount * this.orbitSpeed + this.orbitOffset;
+          this.x = mainBall.x + cos(angle) * this.orbitDistance;
+          this.y = mainBall.y + sin(angle) * this.orbitDistance;
+        } else {
+          // Regular movement
+          this.x += this.dx;
+          this.y += this.dy;
+        }
+      }
+      
+      bounce() {
+        if (this.isBrick) return; // Bricks don't bounce
+        
+        // Wall bouncing
+        if (this.x - this.r <= 0 || this.x + this.r >= width) {
+          this.dx *= -1;
+        }
+        
+        if (this.y - this.r <= 0) {
+          this.dy *= -1;
+        }
+        
+        // Paddle bouncing with physics
+        if (this.y + this.r >= paddle.y && this.y < paddle.y + paddle.h && 
+            this.x > paddle.x && this.x < paddle.x + paddle.w) {
+          
+          // Calculate bounce angle based on where ball hits paddle
+          let relativeIntersect = (this.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+          let bounceAngle = relativeIntersect * (PI/4); // Max 45 degree angle
+          
+          // Set new velocity
+          let speed = sqrt(this.dx*this.dx + this.dy*this.dy);
+          this.dx = sin(bounceAngle) * speed;
+          this.dy = -cos(bounceAngle) * speed;
+        }
+        
+        // Ball falls off bottom
+        if (this.y - this.r > height) {
+          if (this.isMain) {
+            // Reset main ball
+            gameStarted = false;
+            this.dx = 0;
+            this.dy = 0;
+          } else if (this.isOrbiting) {
+            // Remove orbiting ball
+            orbitingBalls = orbitingBalls.filter(b => b !== this);
+          }
+        }
+      }
     }
   </script>
 </body>
