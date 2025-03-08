@@ -162,14 +162,34 @@
     }
 
     function addStreamBall() {
-      let newBall = new Ball(mainBall.x, mainBall.y);
-      // Give the new ball a slightly different angle but same speed as main ball
-      let speed = sqrt(mainBall.dx*mainBall.dx + mainBall.dy*mainBall.dy);
-      let angle = atan2(mainBall.dy, mainBall.dx) + random(-0.2, 0.2);
-      newBall.dx = cos(angle) * speed;
-      newBall.dy = sin(angle) * speed;
+      // Create a new ball at the brick position
+      let pos = getRandomBrickPosition();
+      let newBall = new Ball(pos.x, pos.y);
+      
+      // Only move the ball once the game has started
+      if (gameStarted) {
+        // Give the new ball a similar trajectory to the main ball
+        let speed = sqrt(mainBall.dx*mainBall.dx + mainBall.dy*mainBall.dy);
+        let angle = atan2(mainBall.dy, mainBall.dx) + random(-0.2, 0.2);
+        newBall.dx = cos(angle) * speed;
+        newBall.dy = sin(angle) * speed;
+      }
+      
       newBall.spawnedBall = true;
       streamBalls.push(newBall);
+    }
+    
+    function getRandomBrickPosition() {
+      // If there are bricks, choose a random one's position
+      if (bricks.length > 0) {
+        let brick = random(bricks);
+        return { x: brick.x, y: brick.y };
+      } 
+      // Otherwise use a default position in the brick area
+      return { 
+        x: random(50, width - 50), 
+        y: random(50, 150) 
+      };
     }
     
     function checkBrickCollisions() {
@@ -177,21 +197,47 @@
       let allBalls = [mainBall, ...streamBalls];
       
       for (let i = bricks.length - 1; i >= 0; i--) {
+        let brickHit = false;
+        
         for (let ball of allBalls) {
-          if (checkBallBrickCollision(ball, bricks[i])) {
+          if (checkBallBrickCollision(ball, bricks[i]) && !brickHit) {
             // Brick was hit
+            brickHit = true;
             bricks[i].hp--;
             score += 10;
             
-            // If brick is destroyed, add a stream ball
+            // If brick is destroyed, add a random ball that will be added to stream
             if (bricks[i].hp <= 0) {
-              addStreamBall();
+              // Store position before removing the brick
+              let pos = {x: bricks[i].x, y: bricks[i].y};
+              
+              // Remove the brick
               bricks.splice(i, 1);
+              
+              // Add a stream ball at the brick's position
+              let newBall = new Ball(pos.x, pos.y);
+              newBall.spawnedBall = true;
+              
+              // If game has started, give the ball movement
+              if (gameStarted) {
+                let speed = sqrt(mainBall.dx*mainBall.dx + mainBall.dy*mainBall.dy);
+                let angle = atan2(mainBall.dy, mainBall.dx) + random(-0.2, 0.2);
+                newBall.dx = cos(angle) * speed;
+                newBall.dy = sin(angle) * speed;
+              }
+              
+              streamBalls.push(newBall);
             }
             
             break; // Only count one hit per brick per frame
           }
         }
+      }
+      
+      // Check if all bricks are cleared
+      if (bricks.length === 0) {
+        // Initialize new level with more bricks
+        initializeBricks();
       }
     }
     
