@@ -149,13 +149,39 @@
       let types = ['green', 'pink', 'blue'];
       let hitPoints = { 'green': 34, 'pink': 26, 'blue': 14 };
       
+      // Create a grid to track occupied positions
+      let grid = [];
       for (let x = 50; x < width - 50; x += 60) {
         for (let y = 50; y < 150; y += 30) {
           // Random chance to place a brick (70%)
           if (random() < 0.7) {
             let type = random(types);
             let hp = hitPoints[type];
-            bricks.push(new Brick(x + 25, y + 10, hp, type));
+            let brickX = x + 25;
+            let brickY = y + 10;
+            bricks.push(new Brick(brickX, brickY, hp, type));
+            // Mark position as occupied
+            grid.push({x: brickX, y: brickY});
+          }
+        }
+      }
+      
+      // Spawn random balls in empty spaces (20% chance per empty space)
+      for (let x = 50; x < width - 50; x += 60) {
+        for (let y = 50; y < 150; y += 30) {
+          let posX = x + 25;
+          let posY = y + 10;
+          
+          // Check if position is empty
+          let isEmpty = !grid.some(pos => 
+            Math.abs(pos.x - posX) < 30 && Math.abs(pos.y - posY) < 15
+          );
+          
+          // 20% chance to spawn a ball in empty space
+          if (isEmpty && random() < 0.2) {
+            let newBall = new Ball(posX, posY);
+            newBall.spawnedBall = true;
+            streamBalls.push(newBall);
           }
         }
       }
