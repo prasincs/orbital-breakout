@@ -19,7 +19,6 @@
     let turns = 0;
     let gameStarted = false;
     let aimAngle = -Math.PI/4; // Start aiming up-right
-    let brickHitPoints = { green: 34, pink: 26, blue: 14 };
     let bricks = [];
     
     function setup() {
@@ -77,6 +76,11 @@
         }
       }
       
+      // Show bricks
+      for (let brick of bricks) {
+        brick.show();
+      }
+      
       // Check ball-brick collisions
       checkBrickCollisions();
 
@@ -111,15 +115,15 @@
     function initializeBricks() {
       bricks = []; // Clear existing bricks
       let types = ['green', 'pink', 'blue'];
+      let hitPoints = { 'green': 34, 'pink': 26, 'blue': 14 };
       
       for (let x = 50; x < width - 50; x += 60) {
         for (let y = 50; y < 150; y += 30) {
           // Random chance to place a brick (70%)
           if (random() < 0.7) {
             let type = random(types);
-            let hp = brickHitPoints[type];
-            // Instead of bricks, create orbiting balls
-            bricks.push(new Ball(x + 25, y + 10, false, hp, type));
+            let hp = hitPoints[type];
+            bricks.push(new Brick(x + 25, y + 10, hp, type));
           }
         }
       }
@@ -135,55 +139,53 @@
     }
     
     function checkBrickCollisions() {
-      // Check main ball collisions with bricks
+      // Check all balls for brick collisions
+      let allBalls = [mainBall, ...orbitingBalls];
+      
       for (let i = bricks.length - 1; i >= 0; i--) {
-        // Check main ball
-        if (checkBallBrickCollision(mainBall, bricks[i])) {
-          processBrickHit(bricks[i], i);
-        }
-        
-        // Check orbiting balls
-        for (let j = 0; j < orbitingBalls.length; j++) {
-          if (checkBallBrickCollision(orbitingBalls[j], bricks[i])) {
-            processBrickHit(bricks[i], i);
-            break; // Only count one hit per frame
+        for (let ball of allBalls) {
+          if (checkBallBrickCollision(ball, bricks[i])) {
+            // Brick was hit
+            bricks[i].hp--;
+            score += 10;
+            turns++;
+            
+            // If brick is destroyed, add an orbiting ball
+            if (bricks[i].hp <= 0) {
+              addOrbitingBall();
+              bricks.splice(i, 1);
+            }
+            
+            break; // Only count one hit per brick per frame
           }
         }
       }
     }
     
     function checkBallBrickCollision(ball, brick) {
-      // Only process collisions for moving balls, not the bricks (which are represented as balls)
-      if (!ball.isBrick && brick.isBrick) {
-        let dx = ball.x - brick.x;
-        let dy = ball.y - brick.y;
-        let distance = sqrt(dx*dx + dy*dy);
+      // Calculate distance between ball and brick
+      let dx = ball.x - brick.x;
+      let dy = ball.y - brick.y;
+      let distance = sqrt(dx*dx + dy*dy);
+      
+      if (distance < ball.r + brick.r) {
+        // Calculate collision angle for proper physics
+        let angle = atan2(dy, dx);
         
-        if (distance < ball.r + brick.r) {
-          // Calculate collision angle for proper physics
-          let angle = atan2(dy, dx);
-          
-          // Update ball velocity
-          let speed = sqrt(ball.dx*ball.dx + ball.dy*ball.dy);
-          ball.dx = cos(angle) * speed;
-          ball.dy = sin(angle) * speed;
-          
-          return true;
-        }
+        // Calculate normal vector of collision
+        let nx = dx / distance;
+        let ny = dy / distance;
+        
+        // Calculate dot product (ball's velocity projected onto normal)
+        let dp = ball.dx * nx + ball.dy * ny;
+        
+        // Calculate reflection
+        ball.dx = ball.dx - 2 * dp * nx;
+        ball.dy = ball.dy - 2 * dp * ny;
+        
+        return true;
       }
       return false;
-    }
-    
-    function processBrickHit(brick, index) {
-      brick.hp--;
-      score += 10;
-      turns++;
-      
-      if (brick.hp <= 0) {
-        // Convert brick to orbiting ball
-        addOrbitingBall();
-        bricks.splice(index, 1);
-      }
     }
 
     class Paddle {
@@ -206,7 +208,7 @@
     }
 
     class Ball {
-      constructor(x = width / 2, y = height - 40, isOrbiting = false, hp = 0, type = null) {
+      constructor(x = width / 2, y = height - 40, isOrbiting = false) {
         this.x = x;
         this.y = y;
         this.r = 10;
@@ -214,9 +216,6 @@
         this.dy = 0;
         this.isOrbiting = isOrbiting;
         this.isMain = false;
-        this.isBrick = hp > 0;
-        this.hp = hp;
-        this.type = type;
         
         // Orbiting properties
         if (isOrbiting) {
@@ -227,28 +226,11 @@
       }
       
       show() { 
-        if (this.isBrick) {
-          // Render as a brick (colorful ball with a number)
-          if (this.type === 'green') fill(0, 255, 0);
-          else if (this.type === 'pink') fill(255, 0, 255);
-          else fill(0, 0, 255);
-          
-          ellipse(this.x, this.y, this.r * 2);
-          fill(255);
-          textAlign(CENTER, CENTER);
-          textSize(12);
-          text(this.hp, this.x, this.y);
-          textAlign(LEFT);
-        } else {
-          // Render as a white ball
-          fill(255);
-          ellipse(this.x, this.y, this.r * 2);
-        }
+        fill(255); // White ball
+        ellipse(this.x, this.y, this.r * 2);
       }
       
       move() {
-        if (this.isBrick) return; // Bricks don't move
-        
         if (this.isOrbiting && mainBall) {
           // Orbit around main ball
           let angle = frameCount * this.orbitSpeed + this.orbitOffset;
@@ -262,8 +244,6 @@
       }
       
       bounce() {
-        if (this.isBrick) return; // Bricks don't bounce
-        
         // Wall bouncing
         if (this.x - this.r <= 0 || this.x + this.r >= width) {
           this.dx *= -1;
@@ -299,6 +279,33 @@
             orbitingBalls = orbitingBalls.filter(b => b !== this);
           }
         }
+      }
+    }
+    
+    class Brick {
+      constructor(x, y, hp, type) {
+        this.x = x;
+        this.y = y;
+        this.r = 15; // Radius for collision detection
+        this.hp = hp;
+        this.type = type;
+      }
+      
+      show() {
+        // Color based on brick type
+        if (this.type === 'green') fill(0, 255, 0);
+        else if (this.type === 'pink') fill(255, 0, 255);
+        else fill(0, 0, 255);
+        
+        // Draw the circular brick
+        ellipse(this.x, this.y, this.r * 2);
+        
+        // Draw hit points text
+        fill(255);
+        textAlign(CENTER, CENTER);
+        textSize(12);
+        text(this.hp, this.x, this.y);
+        textAlign(LEFT);
       }
     }
   </script>
